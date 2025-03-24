@@ -1,0 +1,23 @@
+# Setting V4 subnet to 192.0.2.0/24, as this should regularly not be in use on public networks
+# 192.0.2.0/24 allocated in RFCs 1166, 5737
+INFRA_V4_SUBNET=192.0.2.0/24
+
+# Setting V6 to a random prefix inside the V6 documentation network, defined in RFC3849
+INFRA_V6_SUBNET=2001:db8:c0ff:ee::/64
+
+# Have to set local IP addresses because of systemd-resolved binding on localhost.
+# I don't have a good way to auto-detect IP addresses on system programmatically
+# in the compose file.  Suggestions on a post card?
+EXTERNAL_V4_IP=10.0.0.1
+EXTERNAL_V6_IP=2001:db8:face:cafe::2
+
+# External API key
+APIKEY=SOMERANDOMSTRING
+
+# Database Credentials - for the DBs
+DBUSER=powerdns
+DBPASS=SOMESECUREPASS
+DBROOTPASS=OTHERSECUREPASS
+
+# Flask Secret Key - for session cookies for PowerDNS-Admin
+SECRET_KEY=THISREALLYSHOULDBECHANGED
