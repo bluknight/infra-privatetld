@@ -1,0 +1,123 @@
+services:
+  pdns:
+    image: docker.io/powerdns/pdns-auth-49:latest
+    container_name: pdns
+    entrypoint:
+      - "/usr/bin/tini"
+      - "--"
+      - "/usr/local/sbin/pdns_server-startup"
+      - "--api=yes"
+      - "--api-key=${APIKEY}"
+      - "--local-address=127.0.0.1,::1"
+      - "--security-poll-suffix="
+      - "--webserver-address=0.0.0.0"
+      - "--webserver-port=8081"
+      - "--webserver-allow-from=${INFRA_V4_SUBNET},${INFRA_V6_SUBNET}"
+      - "--launch=gmysql"
+      - "--gmysql-dnssec=true"
+      - "--gmysql-host=mariadb"
+      - "--gmysql-dbname=${DBUSER}"
+      - "--gmysql-user=${DBUSER}"
+      - "--gmysql-password=${DBPASS}"
+      - "--config-dir=/dev/null"
+
+    user: root
+    group: root
+    environment:
+      # - DEBUG_CONFIG=yes
+      # - PDNS_api=yes
+      # - PDNS_api-key=${APIKEY}
+      # - PDNS_local-address=127.0.0.1,::1
+      # - PDNS_security-poll-suffix=
+      # - PDNS_webserver-address=0.0.0.0
+      # - PDNS_webserver-port=8081
+      # - PDNS_webserver-allow-from=${INFRA_V4_SUBNET},${INFRA_V6_SUBNET}
+
+      # Use this next segment for an SQLite backend
+      # - PDNS_launch=gsqlite3
+      # - PDNS_gsqlite3=/var/lib/powerdns/pdns.sqlite3
+
+      # Use this next segment for a MySQL/MariaDB backend
+      - PDNS_launch=gmysql
+      - PDNS_gmysql-dnssec=true
+      - PDNS_gmysql-host=localhost
+      - PDNS_gmysql-dbname=${DBUSER}
+      - PDNS_gmysql-user=${DBUSER}
+      - PDNS_gmysql-password=${DBPASS}
+    depends_on:
+      mariadb:
+        condition: service_healthy
+        restart: true
+    network:
+      - default
+    expose:
+      - 8081
+      - 53
+      - 53/udp
+    ports:
+      - "${EXTERNAL_V4_IP}:53:53"
+      - "${EXTERNAL_V4_IP}:53:53/udp"
+      - "[${EXTERNAL_V6_IP}]:53:53"
+      - "[${EXTERNAL_V6_IP}]:53:53/udp"
+      - 8081:8081/tcp
+    volumes:
+      - pdns-data:/var/lib/powerdns:rw
+    cap_add:
+      - CAP_NET_BIND_SERVICE # required for port 53
+  
+  pdns-admin:
+    image: docker.io/powerdnsadmin/pda-legacy:latest
+    container_name: pdns-admin
+    environment:
+      - SQLALCHEMY_DATABASE_URI=mysql://${DBUSER}:${DBPASS}@mariadb/powerdnsadmin
+      - GUNICORN_TIMEOUT=60
+      - GUNICORN_WORKERS=2
+      - GUNICORN_LOGLEVEL=DEBUG
+    depends_on:
+      mariadb:
+        condition: service_healthy
+        restart: true
+    network:
+      - default
+    ports:
+      - 9191:80
+
+  mariadb:
+    image: docker.io/library/mariadb:11.7
+    container_name: mariadb
+    environment:
+      - MARIADB_USER=${DBUSER}
+      - MARIADB_PASSWORD=${DBPASS}
+      - MARIADB_ROOT_PASSWORD=${DBROOTPASS}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--su-mysql", "--connect", "--innodb_initialized"]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
+    network:
+      - default
+    export:
+      - 3306
+    ports:
+      - 3306:3306
+    volumes:
+      - mariadb-data:/var/lib/mysql:Z
+      - /home/mec/infra-privatetld/sqlinitdb:/docker-entrypoint-initdb.d:rw
+
+volumes:
+  # pda-data:
+  #   driver: local
+  pdns-data:
+    driver: local
+  mariadb-data:
+    driver: local
+
+networks:
+  default:
+    enable_ipv4: true
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: ${INFRA_V4_SUBNET}
+        - subnet: ${INFRA_V6_SUBNET}
