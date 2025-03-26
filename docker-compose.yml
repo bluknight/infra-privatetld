@@ -1,4 +1,27 @@
 services:
+  mariadb:
+    image: docker.io/library/mariadb:11.7
+    container_name: mariadb
+    environment:
+      - MARIADB_USER=${DBUSER}
+      - MARIADB_PASSWORD=${DBPASS}
+      - MARIADB_ROOT_PASSWORD=${DBROOTPASS}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--su-mysql", "--connect", "--innodb_initialized"]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
+    network:
+      - default
+    export:
+      - 3306
+    ports:
+      - 3306:3306
+    volumes:
+      - mariadb-data:/var/lib/mysql:Z
+      - /home/mec/infra-privatetld/sqlinitdb:/docker-entrypoint-initdb.d:rw
+
   pdns:
     image: docker.io/powerdns/pdns-auth-49:latest
     container_name: pdns
@@ -81,29 +104,6 @@ services:
       - default
     ports:
       - 9191:80
-
-  mariadb:
-    image: docker.io/library/mariadb:11.7
-    container_name: mariadb
-    environment:
-      - MARIADB_USER=${DBUSER}
-      - MARIADB_PASSWORD=${DBPASS}
-      - MARIADB_ROOT_PASSWORD=${DBROOTPASS}
-    healthcheck:
-      test: ["CMD", "healthcheck.sh", "--su-mysql", "--connect", "--innodb_initialized"]
-      interval: 1m30s
-      timeout: 30s
-      retries: 5
-      start_period: 30s
-    network:
-      - default
-    export:
-      - 3306
-    ports:
-      - 3306:3306
-    volumes:
-      - mariadb-data:/var/lib/mysql:Z
-      - /home/mec/infra-privatetld/sqlinitdb:/docker-entrypoint-initdb.d:rw
 
 volumes:
   # pda-data:
